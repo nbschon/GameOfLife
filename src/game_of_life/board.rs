@@ -19,28 +19,14 @@ impl Board {
         self.cells[x as usize][y as usize] = status;
     }
 
-    pub fn get_neighbor_count(&self, x: i32, y: i32) -> u32 {
-        let mut count: u32 = 0;
+    pub fn get_neighbor_count(&self, x: i32, y: i32) -> u8 {
+        let mut count = 0u8;
 
         for row in x - 1..=x + 1 {
             for col in y - 1..=y + 1 {
-                let mut new_row = row;
-                let mut new_col = col;
-
-                if row == x && col == y {
-                    continue;
-                } else {
-                    if row < 0 {
-                        new_row = self.height + row;
-                    } else if row >= self.height {
-                        new_row -= self.height;
-                    }
-
-                    if col < 0 {
-                        new_col = self.width + col;
-                    } else if col >= self.width {
-                        new_col -= self.width;
-                    }
+                if row != x || col != y {
+                    let new_row = row.rem_euclid(self.height);
+                    let new_col = col.rem_euclid(self.width);
 
                     if self.cells[new_col as usize][new_row as usize] {
                         count += 1;
@@ -48,6 +34,7 @@ impl Board {
                 }
             }
         }
+
         count
     }
 

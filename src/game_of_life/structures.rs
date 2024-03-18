@@ -1,4 +1,3 @@
-pub mod structuress {
     #[derive(PartialEq)]
     pub enum Structure {
         Glider,
@@ -126,4 +125,3 @@ pub mod structuress {
             }
         }
     }
-}
