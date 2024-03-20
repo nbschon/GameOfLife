@@ -16,7 +16,7 @@ pub struct Game {
     board: Board,
     color_alive: Color,
     color_dead: Color,
-    color_grid: Color,
+    color_bg: Color,
     color_ghost_alive: Color,
     color_ghost_dead: Color,
     color_cursor: Color,
@@ -43,7 +43,7 @@ pub struct Game {
     cursor_rect: Rect,
 
     run_sim: bool,
-    denom: u32,
+    denom: i32,
 
     sdl_context: Sdl,
     canvas: Canvas<Window>,
@@ -72,7 +72,7 @@ impl Game {
             board: Board::with_size(cells_width, cells_height),
             color_alive: Color::RGB(0x17, 0x17, 0x17),
             color_dead: Color::RGB(0xF7, 0xF7, 0xF7),
-            color_grid: Color::RGB(0x7F, 0x7F, 0x7F),
+            color_bg: Color::RGB(0x7F, 0x7F, 0x7F),
             color_ghost_alive: Color::RGBA(0, 0, 0xFF, 0x8F),
             color_ghost_dead: Color::RGBA(0, 0, 0xFF, 0x2F),
             color_cursor: Color::RGBA(0xFF, 0, 0, 0x7F),
@@ -121,12 +121,24 @@ impl Game {
             None => 2
         };
 
-        if zoom_in {
-            self.cell_width = (rect_width + delta_length).min(max_dim);
-            self.cell_height = (rect_height + delta_length).min(max_dim);
+        let (new_width, new_height) = if zoom_in {
+            (rect_width + delta_length, rect_height + delta_length)
         } else {
-            self.cell_width = (rect_width - delta_length).max(min_dim);
-            self.cell_height = (rect_height - delta_length).max(min_dim);
+            (rect_width - delta_length, rect_height - delta_length)
+        };
+        let old_per_screen = self.screen_width as i32 / rect_width;
+        let new_per_screen = self.screen_width as i32 / new_width;
+
+        if zoom_in {
+            self.cell_width = new_width.min(max_dim);
+            self.cell_height = new_height.min(max_dim);
+            self.cam_offset_x += (new_per_screen - old_per_screen).abs() as i32;
+            self.cam_offset_y += (new_per_screen - old_per_screen).abs() as i32;
+        } else {
+            self.cell_width = new_width.max(min_dim);
+            self.cell_height = new_height.max(min_dim);
+            self.cam_offset_x -= (old_per_screen - new_per_screen).abs() as i32;
+            self.cam_offset_y -= (old_per_screen - new_per_screen).abs() as i32;
         }
     }
 
@@ -141,7 +153,7 @@ impl Game {
                 self.cell_height as u32 - 2,
             );
 
-            self.canvas.set_draw_color(self.color_grid);
+            self.canvas.set_draw_color(self.color_bg);
             self.canvas.clear();
 
             let mouse_x = event_pump.mouse_state().x();
@@ -215,7 +227,7 @@ impl Game {
             }
 
             self.canvas.present();
-            ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / self.denom));
+            ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / self.denom as u32));
         }
     }
 
@@ -254,21 +266,13 @@ impl Game {
                     self.denom += 5;
                 }
                 Some(Keycode::Down) => {
-                    if self.denom > 5 {
-                        self.denom -= 5;
-                    } else {
-                        self.denom = 1;
-                    }
+                    self.denom = (self.denom - 5).max(1);
                 }
                 Some(Keycode::Right) => {
                     self.denom += 1;
                 }
                 Some(Keycode::Left) => {
-                    if self.denom > 1 {
-                        self.denom -= 1;
-                    } else {
-                        self.denom = 1;
-                    }
+                    self.denom = (self.denom - 1).max(1);
                 }
                 Some(Keycode::Minus) => {
                     self.zoom_in_out(false, Some(keymod));
@@ -332,7 +336,22 @@ impl Game {
                     self.cam_offset_x -= 10;
                 }
                 Some(Keycode::C) => {
-                    self.color_grid = Color::RGB(0x00, 0x00, 0x00);
+                    self.dark_mode = !self.dark_mode;
+                    if self.dark_mode {
+                        self.color_alive = Color::RGB(0xA7, 0xA7, 0xA7);
+                        self.color_dead = Color::RGB(0x17, 0x17, 0x17);
+                        self.color_bg = Color::RGB(0x27, 0x27, 0x27);
+                        self.color_ghost_alive = Color::RGBA(0, 0x96, 0xFF, 0x7F);
+                        self.color_ghost_dead = Color::RGBA(0, 0x96, 0xFF, 0x3F);
+                        self.color_cursor = Color::RGBA(0xFF, 0, 0, 0x7F);
+                    } else {
+                        self.color_alive = Color::RGB(0x17, 0x17, 0x17);
+                        self.color_dead = Color::RGB(0xF7, 0xF7, 0xF7);
+                        self.color_bg = Color::RGB(0x7F, 0x7F, 0x7F);
+                        self.color_ghost_alive = Color::RGBA(0, 0, 0xFF, 0x8F);
+                        self.color_ghost_dead = Color::RGBA(0, 0, 0xFF, 0x2F);
+                        self.color_cursor = Color::RGBA(0xFF, 0, 0, 0x7F);
+                    }
                 }
                 _ => {}
             },
@@ -340,8 +359,7 @@ impl Game {
                 x, y, mouse_btn, ..
             } => match mouse_btn {
                 MouseButton::Left => {
-                    let (new_x, new_y) =
-                        self.mouse_to_coords(x, y, self.cam_offset_x, self.cam_offset_y);
+                    let (new_x, new_y) = self.mouse_to_coords(x, y, self.cam_offset_x, self.cam_offset_y);
                     if self.strctr_selected {
                         let mut x_offset = 0;
 
@@ -359,11 +377,9 @@ impl Game {
                         }
 
                         self.strctr_selected = false;
-                    } else if !self.pan_cam && new_x < self.cells_width && new_x >= 0 && new_y < self.cells_height && new_y >= 0 {
-                        let cell_status =
-                            self.board.get_cell_status(new_x as u32, new_y as u32);
-                        self.board
-                            .set_coords(new_x as u32, new_y as u32, !cell_status);
+                    } else if !self.pan_cam && (0..self.cell_width).contains(&new_x) && (0..self.cell_height).contains(&new_y) {
+                        let cell_status = self.board.get_cell_status(new_x as u32, new_y as u32);
+                        self.board .set_coords(new_x as u32, new_y as u32, !cell_status);
                     }
                 }
                 MouseButton::Right => {

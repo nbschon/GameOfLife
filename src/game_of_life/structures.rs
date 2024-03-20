@@ -1,9 +1,9 @@
     #[derive(PartialEq)]
     pub enum Structure {
         Glider,
-        LWSS,
-        MWSS,
-        HWSS,
+        Lwss,
+        Mwss,
+        Hwss,
         Rpent,
         Diehard,
         Acorn,
@@ -15,9 +15,9 @@
         pub fn to_usize(&self) -> usize {
             match self {
                 Structure::Glider => 0,
-                Structure::LWSS => 1,
-                Structure::MWSS => 2,
-                Structure::HWSS => 3,
+                Structure::Lwss => 1,
+                Structure::Mwss => 2,
+                Structure::Hwss => 3,
                 Structure::Rpent => 4,
                 Structure::Diehard => 5,
                 Structure::Acorn => 6,
@@ -29,9 +29,9 @@
         pub fn from_usize(value: usize) -> Option<Structure> {
             match value {
                 0 => Some(Structure::Glider),
-                1 => Some(Structure::LWSS),
-                2 => Some(Structure::MWSS),
-                3 => Some(Structure::HWSS),
+                1 => Some(Structure::Lwss),
+                2 => Some(Structure::Mwss),
+                3 => Some(Structure::Hwss),
                 4 => Some(Structure::Rpent),
                 5 => Some(Structure::Diehard),
                 6 => Some(Structure::Acorn),
@@ -51,7 +51,7 @@
                     vec![0, 1, 1]
                 ]
             },
-            Structure::LWSS => {
+            Structure::Lwss => {
                 vec![
                     vec![0, 1, 1, 1, 1],
                     vec![1, 0, 0, 0, 1],
@@ -59,7 +59,7 @@
                     vec![1, 0, 0, 1, 0]
                 ]
             },
-            Structure::MWSS => {
+            Structure::Mwss => {
                 vec![
                     vec![0, 0, 1, 0, 0, 0],
                     vec![1, 0, 0, 0, 1, 0],
@@ -68,7 +68,7 @@
                     vec![0, 1, 1, 1, 1, 1]
                 ]
             },
-            Structure::HWSS => {
+            Structure::Hwss => {
                 vec![
                     vec![0, 0, 1, 1, 0, 0, 0],
                     vec![1, 0, 0, 0, 0, 1, 0],
