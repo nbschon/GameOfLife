@@ -1,5 +1,5 @@
 use GameOfLife::run;
 
-fn main() {
-    run();
+fn main() -> Result<(), String> {
+    Ok(run()?)
 }

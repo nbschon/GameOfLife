@@ -15,10 +15,6 @@ impl Board {
         }
     }
 
-    pub fn set_coords(&mut self, x: u32, y: u32, status: bool) {
-        self.cells[x as usize][y as usize] = status;
-    }
-
     pub fn get_neighbor_count(&self, x: i32, y: i32) -> u8 {
         let mut count = 0u8;
 
@@ -61,10 +57,7 @@ impl Board {
         }
 
         self.cells = self.new_cells.to_vec();
-    }
-
-    pub fn get_cell_status(&self, x: u32, y: u32) -> bool {
-        self.cells[x as usize][y as usize]
+        std::mem::swap(&mut self.cells, &mut self.new_cells);
     }
 
     pub fn reset(&mut self) {

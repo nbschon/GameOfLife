@@ -8,7 +8,7 @@ use sdl2::{
     rect::Rect,
     render::Canvas,
     video::Window,
-    Sdl
+    Sdl, image::LoadTexture,
 };
 use std::time::Duration;
 
@@ -25,8 +25,8 @@ pub struct Game {
     screen_width: u32,
     screen_height: u32,
 
-    cells_width: i32,
-    cells_height: i32,
+    // cells_width: i32,
+    // cells_height: i32,
     cell_width: i32,
     cell_height: i32,
 
@@ -47,6 +47,9 @@ pub struct Game {
 
     sdl_context: Sdl,
     canvas: Canvas<Window>,
+    tex_width: u32,
+    tex_height: u32,
+    tex_offset: i32,
 }
 
 impl Game {
@@ -68,6 +71,10 @@ impl Game {
         let cell_width = 12;
         let cell_height = 12;
 
+        let tex_offset = 30;
+        let tex_width = 1000;
+        let tex_height = height - tex_offset as u32 * 2;
+
         Game {
             board: Board::with_size(cells_width, cells_height),
             color_alive: Color::RGB(0x17, 0x17, 0x17),
@@ -79,8 +86,8 @@ impl Game {
             dark_mode: false,
             screen_width: width,
             screen_height: height,
-            cells_width,
-            cells_height,
+            // cells_width,
+            // cells_height,
             cell_width: 12,
             cell_height: 12,
             generation: 0,
@@ -99,6 +106,9 @@ impl Game {
 
             sdl_context,
             canvas,
+            tex_width,
+            tex_height,
+            tex_offset
         }
     }
 
@@ -132,18 +142,24 @@ impl Game {
         if zoom_in {
             self.cell_width = new_width.min(max_dim);
             self.cell_height = new_height.min(max_dim);
-            self.cam_offset_x += (new_per_screen - old_per_screen).abs() as i32;
-            self.cam_offset_y += (new_per_screen - old_per_screen).abs() as i32;
+            self.cam_offset_x += (new_per_screen - old_per_screen).abs();
+            self.cam_offset_y += (new_per_screen - old_per_screen).abs();
         } else {
             self.cell_width = new_width.max(min_dim);
             self.cell_height = new_height.max(min_dim);
-            self.cam_offset_x -= (old_per_screen - new_per_screen).abs() as i32;
-            self.cam_offset_y -= (old_per_screen - new_per_screen).abs() as i32;
+            self.cam_offset_x -= (old_per_screen - new_per_screen).abs();
+            self.cam_offset_y -= (old_per_screen - new_per_screen).abs();
         }
     }
 
-    pub fn game_loop(&mut self) {
+    pub fn game_loop(&mut self) -> Result<(), String> {
         let mut event_pump = self.sdl_context.event_pump().unwrap();
+
+        let texture_creator = self.canvas.texture_creator();
+        let mut game_tex = texture_creator.create_texture(None, sdl2::render::TextureAccess::Target, self.tex_width, self.tex_height).unwrap();
+        let pause_tex = texture_creator.load_texture("img/pause.png")?;
+        let pause_rect = Rect::new(self.tex_width as i32 + self.tex_offset * 2, self.tex_offset, 100, 100);
+        let _  = self.canvas.draw_rect(pause_rect);
 
         'running: loop {
             let mut cell_rect = Rect::new(
@@ -153,33 +169,37 @@ impl Game {
                 self.cell_height as u32 - 2,
             );
 
-            self.canvas.set_draw_color(self.color_bg);
+            self.canvas.set_draw_color(Color::RGB(39, 45, 54));
             self.canvas.clear();
 
-            let mouse_x = event_pump.mouse_state().x();
-            let mouse_y = event_pump.mouse_state().y();
+            let _  = self.canvas.with_texture_canvas(&mut game_tex, |tc| {
+                tc.set_draw_color(self.color_bg);
+                tc.clear();
+                let cells = &self.board.cells;
+                for row in cells {
+                    for col in row {
+                        if (-self.cell_width..self.screen_width as i32).contains(&cell_rect.x)
+                            && (-self.cell_height..self.screen_height as i32).contains(&cell_rect.y) {
+                            tc.set_draw_color(
+                                if *col {
+                                    self.color_alive
+                                } else {
+                                    self.color_dead
+                                }
+                            );
 
-            let cells = &self.board.cells;
-            for row in cells {
-                for col in row {
-                    if (-self.cell_width..self.screen_width as i32).contains(&cell_rect.x)
-                        && (-self.cell_height..self.screen_height as i32).contains(&cell_rect.y) {
-                        self.canvas.set_draw_color(
-                            if *col {
-                                self.color_alive
-                            } else {
-                                self.color_dead
-                            }
-                        );
-
-                        let _ = self.canvas.fill_rect(cell_rect);
+                            let _ = tc.fill_rect(cell_rect);
+                        }
+                        cell_rect.y += self.cell_height;
                     }
-                    cell_rect.y += self.cell_height;
-                }
 
-                cell_rect.x += self.cell_width;
-                cell_rect.y = self.cam_offset_y + 1;
-            }
+                    cell_rect.x += self.cell_width;
+                    cell_rect.y = self.cam_offset_y + 1;
+                }
+            });
+
+            let mouse_x = event_pump.mouse_state().x() - self.tex_offset;
+            let mouse_y = event_pump.mouse_state().y() - self.tex_offset;
 
             for event in event_pump.poll_iter() {
                 if self.do_input(event) { break 'running; }
@@ -193,33 +213,40 @@ impl Game {
             self.cursor_rect.x = cursor_rect_x;
             self.cursor_rect.y = cursor_rect_y;
 
-            if self.pan_cam {
-                let new_mouse_x = event_pump.mouse_state().x();
-                let new_mouse_y = event_pump.mouse_state().y();
-                self.cam_offset_x += new_mouse_x - mouse_x;
-                self.cam_offset_y += new_mouse_y - mouse_y;
-            } else if self.strctr_selected {
-                let mut ghost_rect = Rect::new(
-                    cursor_rect_x, cursor_rect_y, self.cell_width as u32, self.cell_height as u32);
+            let _ = self.canvas.with_texture_canvas(&mut game_tex, |tc| {
+                if self.pan_cam {
+                    let new_mouse_x = event_pump.mouse_state().x() - self.tex_offset;
+                    let new_mouse_y = event_pump.mouse_state().y() - self.tex_offset;
+                    self.cam_offset_x += new_mouse_x - mouse_x;
+                    self.cam_offset_y += new_mouse_y - mouse_y;
+                } else if self.strctr_selected {
+                    let mut ghost_rect = Rect::new(
+                        cursor_rect_x, cursor_rect_y, self.cell_width as u32, self.cell_height as u32
+                    );
 
-                for row in &self.strctr_cursor {
-                    for col in row {
-                        match *col {
-                            0 => self.canvas.set_draw_color(self.color_ghost_dead),
-                            1 => self.canvas.set_draw_color(self.color_ghost_alive),
-                            _ => unreachable!("Bad value in structure array")
+                    for row in &self.strctr_cursor {
+                        for col in row {
+                            match *col {
+                                0 => tc.set_draw_color(self.color_ghost_dead),
+                                1 => tc.set_draw_color(self.color_ghost_alive),
+                                _ => unreachable!("Bad value in structure array")
+                            }
+
+                            let _ = tc.fill_rect(ghost_rect);
+                            ghost_rect.x += self.cell_width;
                         }
-
-                        let _ = self.canvas.fill_rect(ghost_rect);
-                        ghost_rect.x += self.cell_width;
+                        ghost_rect.y += self.cell_height;
+                        ghost_rect.x = (cursor_x * self.cell_width) + self.cam_offset_x;
                     }
-                    ghost_rect.y += self.cell_height;
-                    ghost_rect.x = (cursor_x * self.cell_width) + self.cam_offset_x;
+                } else {
+                    tc.set_draw_color(self.color_cursor);
+                    let _ = tc.fill_rect(self.cursor_rect);
                 }
-            } else {
-                self.canvas.set_draw_color(self.color_cursor);
-                let _ = self.canvas.fill_rect(self.cursor_rect);
-            }
+            });
+
+            let draw_rect = Rect::new(self.tex_offset, self.tex_offset, self.tex_width, self.tex_height);
+            let _ = self.canvas.copy(&game_tex, None, draw_rect);
+            let _ = self.canvas.copy(&pause_tex, None, pause_rect);
 
             if self.run_sim {
                 self.board.step_game();
@@ -229,6 +256,8 @@ impl Game {
             self.canvas.present();
             ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / self.denom as u32));
         }
+
+        Ok(())
     }
 
     fn do_input(&mut self, event: Event) -> bool {
@@ -359,9 +388,15 @@ impl Game {
                 x, y, mouse_btn, ..
             } => match mouse_btn {
                 MouseButton::Left => {
-                    let (new_x, new_y) = self.mouse_to_coords(x, y, self.cam_offset_x, self.cam_offset_y);
+                    let (new_x, new_y) = self.mouse_to_coords(
+                        x - self.tex_offset, 
+                        y - self.tex_offset, 
+                        self.cam_offset_x - self.tex_offset, 
+                        self.cam_offset_y - self.tex_offset
+                    );
+
                     if self.strctr_selected {
-                        let mut x_offset = 0;
+                        let mut x_offset = 0usize;
 
                         for (y_offset, row) in self.strctr_cursor.iter().enumerate() {
                             for col in row {
@@ -370,7 +405,7 @@ impl Game {
                                     1 => true,
                                     _ => panic!("Bad value in structure array")
                                 };
-                                self.board.set_coords(x_offset + new_x as u32, y_offset as u32 + new_y as u32, status);
+                                self.board.cells[x_offset + new_x as usize][y_offset + new_y as usize] = status;
                                 x_offset += 1;
                             }
                             x_offset = 0;
@@ -378,8 +413,8 @@ impl Game {
 
                         self.strctr_selected = false;
                     } else if !self.pan_cam && (0..self.cell_width).contains(&new_x) && (0..self.cell_height).contains(&new_y) {
-                        let cell_status = self.board.get_cell_status(new_x as u32, new_y as u32);
-                        self.board .set_coords(new_x as u32, new_y as u32, !cell_status);
+                        let cell_status = self.board.cells[new_x as usize][new_y as usize];
+                        self.board.cells[new_x as usize][new_y as usize] = !cell_status;
                     }
                 }
                 MouseButton::Right => {
