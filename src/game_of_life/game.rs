@@ -1,14 +1,15 @@
-use crate::game_of_life::structures::*;
 use crate::game_of_life::board::Board;
+use crate::game_of_life::structures::*;
 use sdl2::{
     event::Event,
+    image::LoadTexture,
     keyboard::{Keycode, Mod},
     mouse::MouseButton,
     pixels::Color,
     rect::Rect,
     render::Canvas,
     video::Window,
-    Sdl, image::LoadTexture,
+    Sdl,
 };
 use std::time::Duration;
 
@@ -25,8 +26,6 @@ pub struct Game {
     screen_width: u32,
     screen_height: u32,
 
-    // cells_width: i32,
-    // cells_height: i32,
     cell_width: i32,
     cell_height: i32,
 
@@ -86,8 +85,6 @@ impl Game {
             dark_mode: false,
             screen_width: width,
             screen_height: height,
-            // cells_width,
-            // cells_height,
             cell_width: 12,
             cell_height: 12,
             generation: 0,
@@ -108,7 +105,7 @@ impl Game {
             canvas,
             tex_width,
             tex_height,
-            tex_offset
+            tex_offset,
         }
     }
 
@@ -128,7 +125,7 @@ impl Game {
         let delta_length = match keymod {
             Some(km) if km.intersects(Mod::LSHIFTMOD | Mod::RSHIFTMOD) => 5,
             Some(_) => 1,
-            None => 2
+            None => 2,
         };
 
         let (new_width, new_height) = if zoom_in {
@@ -156,10 +153,22 @@ impl Game {
         let mut event_pump = self.sdl_context.event_pump().unwrap();
 
         let texture_creator = self.canvas.texture_creator();
-        let mut game_tex = texture_creator.create_texture(None, sdl2::render::TextureAccess::Target, self.tex_width, self.tex_height).unwrap();
+        let mut game_tex = texture_creator
+            .create_texture(
+                None,
+                sdl2::render::TextureAccess::Target,
+                self.tex_width,
+                self.tex_height,
+            )
+            .unwrap();
         let pause_tex = texture_creator.load_texture("img/pause.png")?;
-        let pause_rect = Rect::new(self.tex_width as i32 + self.tex_offset * 2, self.tex_offset, 100, 100);
-        let _  = self.canvas.draw_rect(pause_rect);
+        let pause_rect = Rect::new(
+            self.tex_width as i32 + self.tex_offset * 2,
+            self.tex_offset,
+            100,
+            100,
+        );
+        let _ = self.canvas.draw_rect(pause_rect);
 
         'running: loop {
             let mut cell_rect = Rect::new(
@@ -169,24 +178,23 @@ impl Game {
                 self.cell_height as u32 - 2,
             );
 
-            self.canvas.set_draw_color(Color::RGB(39, 45, 54));
+            self.canvas.set_draw_color(Color::RGB(0x27, 0x2D, 0x36));
             self.canvas.clear();
 
-            let _  = self.canvas.with_texture_canvas(&mut game_tex, |tc| {
+            let _ = self.canvas.with_texture_canvas(&mut game_tex, |tc| {
                 tc.set_draw_color(self.color_bg);
                 tc.clear();
                 let cells = &self.board.cells;
                 for row in cells {
                     for col in row {
                         if (-self.cell_width..self.screen_width as i32).contains(&cell_rect.x)
-                            && (-self.cell_height..self.screen_height as i32).contains(&cell_rect.y) {
-                            tc.set_draw_color(
-                                if *col {
-                                    self.color_alive
-                                } else {
-                                    self.color_dead
-                                }
-                            );
+                            && (-self.cell_height..self.screen_height as i32).contains(&cell_rect.y)
+                        {
+                            tc.set_draw_color(if *col {
+                                self.color_alive
+                            } else {
+                                self.color_dead
+                            });
 
                             let _ = tc.fill_rect(cell_rect);
                         }
@@ -202,7 +210,9 @@ impl Game {
             let mouse_y = event_pump.mouse_state().y() - self.tex_offset;
 
             for event in event_pump.poll_iter() {
-                if self.do_input(event) { break 'running; }
+                if self.do_input(event) {
+                    break 'running;
+                }
             }
 
             let (cursor_x, cursor_y) =
@@ -221,7 +231,10 @@ impl Game {
                     self.cam_offset_y += new_mouse_y - mouse_y;
                 } else if self.strctr_selected {
                     let mut ghost_rect = Rect::new(
-                        cursor_rect_x, cursor_rect_y, self.cell_width as u32, self.cell_height as u32
+                        cursor_rect_x,
+                        cursor_rect_y,
+                        self.cell_width as u32,
+                        self.cell_height as u32,
                     );
 
                     for row in &self.strctr_cursor {
@@ -229,7 +242,7 @@ impl Game {
                             match *col {
                                 0 => tc.set_draw_color(self.color_ghost_dead),
                                 1 => tc.set_draw_color(self.color_ghost_alive),
-                                _ => unreachable!("Bad value in structure array")
+                                _ => unreachable!("Bad value in structure array"),
                             }
 
                             let _ = tc.fill_rect(ghost_rect);
@@ -244,7 +257,12 @@ impl Game {
                 }
             });
 
-            let draw_rect = Rect::new(self.tex_offset, self.tex_offset, self.tex_width, self.tex_height);
+            let draw_rect = Rect::new(
+                self.tex_offset,
+                self.tex_offset,
+                self.tex_width,
+                self.tex_height,
+            );
             let _ = self.canvas.copy(&game_tex, None, draw_rect);
             let _ = self.canvas.copy(&pause_tex, None, pause_rect);
 
@@ -325,7 +343,8 @@ impl Game {
                     }
                 }
                 Some(Keycode::D) => {
-                    if self.strctr_selected && Structure::from_usize(self.strctr_idx + 1).is_some() {
+                    if self.strctr_selected && Structure::from_usize(self.strctr_idx + 1).is_some()
+                    {
                         self.strctr_idx += 1;
                         let strctr = Structure::from_usize(self.strctr_idx);
                         self.strctr_cursor = get_structure_vec(strctr.unwrap());
@@ -389,30 +408,34 @@ impl Game {
             } => match mouse_btn {
                 MouseButton::Left => {
                     let (new_x, new_y) = self.mouse_to_coords(
-                        x - self.tex_offset, 
-                        y - self.tex_offset, 
-                        self.cam_offset_x - self.tex_offset, 
-                        self.cam_offset_y - self.tex_offset
+                        x - self.tex_offset,
+                        y - self.tex_offset,
+                        self.cam_offset_x,
+                        self.cam_offset_y,
                     );
 
                     if self.strctr_selected {
-                        let mut x_offset = 0usize;
-
-                        for (y_offset, row) in self.strctr_cursor.iter().enumerate() {
-                            for col in row {
-                                let status = match *col {
-                                    0 => false,
-                                    1 => true,
-                                    _ => panic!("Bad value in structure array")
-                                };
-                                self.board.cells[x_offset + new_x as usize][y_offset + new_y as usize] = status;
-                                x_offset += 1;
+                        if (0..self.board.width).contains(&new_x)
+                            && (0..self.board.height).contains(&new_y)
+                        {
+                            for (y_offset, row) in self.strctr_cursor.iter().enumerate() {
+                                for (x_offset, col) in row.iter().enumerate() {
+                                    let status = match *col {
+                                        0 => false,
+                                        1 => true,
+                                        _ => panic!("Bad value in structure array"),
+                                    };
+                                    self.board.cells[x_offset + new_x as usize]
+                                        [y_offset + new_y as usize] = status;
+                                }
                             }
-                            x_offset = 0;
                         }
 
                         self.strctr_selected = false;
-                    } else if !self.pan_cam && (0..self.cell_width).contains(&new_x) && (0..self.cell_height).contains(&new_y) {
+                    } else if !self.pan_cam
+                        && (0..self.board.width).contains(&new_x)
+                        && (0..self.board.height).contains(&new_y)
+                    {
                         let cell_status = self.board.cells[new_x as usize][new_y as usize];
                         self.board.cells[new_x as usize][new_y as usize] = !cell_status;
                     }
@@ -422,9 +445,11 @@ impl Game {
                 }
                 _ => {}
             },
-            Event::MouseButtonUp { mouse_btn, .. } => if mouse_btn == MouseButton::Right {
-                self.pan_cam = false;
-            },
+            Event::MouseButtonUp { mouse_btn, .. } => {
+                if mouse_btn == MouseButton::Right {
+                    self.pan_cam = false;
+                }
+            }
             Event::MouseWheel { y, .. } => {
                 match y {
                     y if y > 0 => self.zoom_in_out(true, None),

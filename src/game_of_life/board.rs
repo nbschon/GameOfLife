@@ -2,7 +2,7 @@ pub struct Board {
     pub width: i32,
     pub height: i32,
     pub cells: Vec<Vec<bool>>,
-    pub new_cells: Vec<Vec<bool>>
+    pub new_cells: Vec<Vec<bool>>,
 }
 
 impl Board {
@@ -45,15 +45,11 @@ impl Board {
     }
 
     pub fn step_game(&mut self) {
-        let mut x_pos = 0;
-
         for (y_pos, row) in self.cells.iter().enumerate() {
-            for _ in row {
-                let cell_status = self.evolve_cell(x_pos, y_pos as i32);
+            for (x_pos, _) in row.iter().enumerate() {
+                let cell_status = self.evolve_cell(x_pos as i32, y_pos as i32);
                 self.new_cells[y_pos][x_pos as usize] = cell_status;
-                x_pos += 1;
             }
-            x_pos = 0;
         }
 
         self.cells = self.new_cells.to_vec();
