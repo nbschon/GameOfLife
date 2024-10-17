@@ -8,7 +8,7 @@ use sdl2::{
     pixels::Color,
     rect::Rect,
     render::Canvas,
-    video::Window,
+    video::{Window, self},
     Sdl,
 };
 use std::time::Duration;
@@ -62,7 +62,7 @@ impl Game {
             .build()
             .unwrap();
 
-        let mut canvas = window.into_canvas().build().unwrap();
+        let mut canvas = window.into_canvas().accelerated().build().unwrap();
         canvas.set_blend_mode(sdl2::render::BlendMode::Blend);
 
         let cells_width = 1000;
@@ -382,6 +382,9 @@ impl Game {
                 }
                 Some(Keycode::L) => {
                     self.cam_offset_x -= 10;
+                }
+                Some(Keycode::V) => {
+                    self.board.randomize();
                 }
                 Some(Keycode::C) => {
                     self.dark_mode = !self.dark_mode;

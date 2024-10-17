@@ -1,3 +1,7 @@
+use core::panic;
+
+use rand::distributions::{Uniform, Distribution};
+
 pub struct Board {
     pub width: i32,
     pub height: i32,
@@ -52,7 +56,6 @@ impl Board {
             }
         }
 
-        self.cells = self.new_cells.to_vec();
         std::mem::swap(&mut self.cells, &mut self.new_cells);
     }
 
@@ -60,6 +63,21 @@ impl Board {
         for col in &mut self.cells {
             for row in col {
                 *row = false;
+            }
+        }
+    }
+
+    pub fn randomize(&mut self) {
+        let mut rng = rand::thread_rng();
+        let dist = Uniform::from(0..=1);
+
+        for col in &mut self.cells {
+            for row in col {
+                *row = match dist.sample(&mut rng) {
+                    0 => false,
+                    1 => true,
+                    _ => panic!("oh no!"),
+                };
             }
         }
     }

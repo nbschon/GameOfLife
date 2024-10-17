@@ -1,4 +1,3 @@
-
 #[derive(PartialEq)]
 pub enum Structure {
     Glider,
@@ -11,6 +10,11 @@ pub enum Structure {
     GosperGun,
     Infinite1,
     TwoGliderOcto,
+    Pi,
+    Bunnies,
+    Bunnies11,
+    Ehept,
+    Jaydot,
 }
 
 impl Structure {
@@ -26,6 +30,11 @@ impl Structure {
             Structure::GosperGun => 7,
             Structure::Infinite1 => 8,
             Structure::TwoGliderOcto => 9,
+            Structure::Pi => 10,
+            Structure::Bunnies => 11,
+            Structure::Bunnies11 => 12,
+            Structure::Ehept => 13,
+            Structure::Jaydot => 14,
         }
     }
 
@@ -41,6 +50,11 @@ impl Structure {
             7 => Some(Structure::GosperGun),
             8 => Some(Structure::Infinite1),
             9 => Some(Structure::TwoGliderOcto),
+            10 => Some(Structure::Pi),
+            11 => Some(Structure::Bunnies),
+            12 => Some(Structure::Bunnies11),
+            13 => Some(Structure::Ehept),
+            14 => Some(Structure::Jaydot),
             _ => None,
         }
     }
@@ -130,6 +144,48 @@ pub fn get_structure_vec(strctr: Structure) -> Vec<Vec<u8>> {
                 vec![0, 0, 1, 1],
                 vec![1, 1, 1, 0],
                 vec![0, 1, 0, 0],
+            ]
+        }
+        Structure::Pi => {
+            vec![
+                vec![1, 1, 1],
+                vec![1, 0, 1],
+                vec![1, 0, 1],
+            ]
+        }
+        Structure::Bunnies => {
+            vec![
+                vec![1, 0, 0, 0, 0, 0, 1, 0],
+                vec![0, 0, 1, 0, 0, 0, 1, 0],
+                vec![0, 0, 1, 0, 0, 1, 0, 1],
+                vec![0, 1, 0, 1, 0, 0, 0, 0],
+            ]
+        }
+        Structure::Bunnies11 => {
+            vec![
+                vec![0, 0, 1, 0],
+                vec![1, 1, 0, 1],
+                vec![0, 0, 0, 1],
+                vec![0, 1, 0, 1],
+                vec![1, 0, 0, 0],
+                vec![0, 1, 1, 1],
+            ]
+        }
+        Structure::Ehept => {
+            vec![
+                vec![0, 1, 1, 1],
+                vec![1, 1, 0, 0],
+                vec![0, 1, 1, 0],
+            ]
+        }
+        Structure::Jaydot => {
+            vec![
+                vec![0, 1, 1],
+                vec![1, 1, 1],
+                vec![0, 0, 0],
+                vec![0, 1, 0],
+                vec![0, 1, 1],
+                vec![1, 0, 0],
             ]
         }
         #[allow(unreachable_patterns)]
