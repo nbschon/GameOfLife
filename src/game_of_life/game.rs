@@ -2,16 +2,22 @@ use crate::game_of_life::board::Board;
 use crate::game_of_life::structures::*;
 use sdl2::{
     event::Event,
-    image::LoadTexture,
     keyboard::{Keycode, Mod},
     mouse::MouseButton,
     pixels::Color,
     rect::Rect,
     render::Canvas,
-    video::{Window, self},
+    video::Window,
     Sdl,
 };
 use std::time::Duration;
+
+enum MoveDir {
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT
+}
 
 pub struct Game {
     board: Board,
@@ -34,12 +40,15 @@ pub struct Game {
     pan_cam: bool,
     cam_offset_x: i32,
     cam_offset_y: i32,
+    move_dir: Option<MoveDir>,
 
+    structures: Structures,
     strctr_selected: bool,
     strctr_idx: usize,
     strctr_cursor: Vec<Vec<u8>>,
 
     cursor_rect: Rect,
+    last_selected: Option<bool>,
 
     run_sim: bool,
     denom: i32,
@@ -65,8 +74,8 @@ impl Game {
         let mut canvas = window.into_canvas().accelerated().build().unwrap();
         canvas.set_blend_mode(sdl2::render::BlendMode::Blend);
 
-        let cells_width = 200;
-        let cells_height = 200;
+        let cells_width = 300;
+        let cells_height = 300;
         let cell_width = 12;
         let cell_height = 12;
 
@@ -91,12 +100,15 @@ impl Game {
             pan_cam: false,
             cam_offset_x: 40,
             cam_offset_y: 40,
+            move_dir: None,
 
+            structures: load_from_json("structures.json".to_string()).unwrap(),
             strctr_selected: false,
             strctr_idx: 0,
             strctr_cursor: vec![],
 
             cursor_rect: Rect::new(0, 0, cell_width as u32, cell_height as u32),
+            last_selected: None,
 
             run_sim: false,
             denom: 60,
@@ -114,6 +126,74 @@ impl Game {
         let array_y = (y - self.cam_offset_y) / self.cell_height;
 
         (array_x, array_y)
+    }
+
+    fn plot_line_low(&mut self, pt_1: (i32, i32), pt_2: (i32, i32)) {
+        let (x0, y0) = pt_1;
+        let (x1, y1) = pt_2;
+        let dx = x1 - x0;
+        let mut dy = y1 - y0;
+        let mut yi = 1i32;
+        if dy < 0 {
+            yi = -1;
+            dy = -dy;
+        }
+        let mut d = (dy * 2) - dx;
+        let mut y = y0;
+        if let Some(status) = self.last_selected {
+            for x in x0..x1 {
+                self.board.cells[x as usize][y as usize] = status;
+                if d > 0 {
+                    y += yi;
+                    d += 2 * (dy - dx);
+                } else {
+                    d += dy * 2;
+                }
+            }
+        }
+    }
+
+    fn plot_line_high(&mut self, pt_1: (i32, i32), pt_2: (i32, i32)) {
+        let (x0, y0) = pt_1;
+        let (x1, y1) = pt_2;
+        let mut dx = x1 - x0;
+        let dy = y1 - y0;
+        let mut xi = 1i32;
+        if dx < 0 {
+            xi = -1;
+            dx = -dx;
+        }
+        let mut d = (dx * 2) - dy;
+        let mut x = x0;
+        if let Some(status) = self.last_selected {
+            for y in y0..y1 {
+                self.board.cells[x as usize][y as usize] = status;
+                if d > 0 {
+                    x += xi;
+                    d += 2 * (dx - dy);
+                } else {
+                    d += dx * 2;
+                }
+            }
+        }
+    }
+
+    fn plot_line(&mut self, pt_1: (i32, i32), pt_2: (i32, i32)) {
+        let (x0, y0) = pt_1;
+        let (x1, y1) = pt_2;
+        if (y1 - y0).abs() < (x1 - x0).abs() {
+            if x0 > x1 {
+                self.plot_line_low(pt_2, pt_1);
+            } else {
+                self.plot_line_low(pt_1, pt_2);
+            }
+        } else {
+            if y0 > y1 {
+                self.plot_line_high(pt_2, pt_1);
+            } else {
+                self.plot_line_high(pt_1, pt_2);
+            }
+        }
     }
 
     fn zoom_in_out(&mut self, zoom_in: bool, keymod: Option<Mod>, mouse_pos: Option<(i32, i32)>) {
@@ -152,6 +232,9 @@ impl Game {
 
     pub fn game_loop(&mut self) -> Result<(), String> {
         let mut event_pump = self.sdl_context.event_pump().unwrap();
+
+
+        let (mut cursor_x, mut cursor_y) = (0, 0);
 
         let texture_creator = self.canvas.texture_creator();
         let mut game_tex = texture_creator
@@ -216,7 +299,19 @@ impl Game {
                 }
             }
 
-            let (cursor_x, cursor_y) = self.mouse_to_coords(mouse_x, mouse_y);
+            let (old_cx, old_cy) = (cursor_x, cursor_y);
+            (cursor_x, cursor_y) = self.mouse_to_coords(mouse_x, mouse_y);
+            if let Some(held_status) = self.last_selected {
+                if cursor_x >= 0 && (cursor_x as usize) < self.board.cells.len() && cursor_y >= 0 && (cursor_y as usize) < self.board.cells[0].len() {
+                    if self.board.cells[cursor_x as usize][cursor_y as usize] != held_status {
+                        if (old_cx, old_cy) != (cursor_x, cursor_y) {
+                            self.plot_line((old_cx, old_cy), (cursor_x, cursor_y));
+                        } else {
+                            self.board.cells[cursor_x as usize][cursor_y as usize] = held_status;
+                        }
+                    }
+                }
+            }
 
             let cursor_rect_x = (cursor_x * self.cell_width) + self.cam_offset_x;
             let cursor_rect_y = (cursor_y * self.cell_height) + self.cam_offset_y;
@@ -224,7 +319,15 @@ impl Game {
             self.cursor_rect.y = cursor_rect_y;
 
             let _ = self.canvas.with_texture_canvas(&mut game_tex, |tc| {
-                if self.pan_cam {
+                if self.move_dir.is_some() {
+                    match self.move_dir {
+                        Some(MoveDir::UP) => { self.cam_offset_y += 10; },
+                        Some(MoveDir::DOWN) => { self.cam_offset_y -= 10; },
+                        Some(MoveDir::LEFT) => { self.cam_offset_x += 10; },
+                        Some(MoveDir::RIGHT) => { self.cam_offset_x -= 10; },
+                        _ => {}
+                    }
+                } else if self.pan_cam {
                     let new_mouse_x = event_pump.mouse_state().x() - self.tex_offset;
                     let new_mouse_y = event_pump.mouse_state().y() - self.tex_offset;
                     self.cam_offset_x += new_mouse_x - mouse_x;
@@ -261,7 +364,6 @@ impl Game {
                 0, 0, self.screen_width, self.screen_height,
             );
             let _ = self.canvas.copy(&game_tex, None, draw_rect);
-            // let _ = self.canvas.copy(&pause_tex, None, pause_rect);
 
             if self.run_sim {
                 self.board.step_game();
@@ -330,30 +432,25 @@ impl Game {
                 }
                 Some(Keycode::S) => {
                     if !self.strctr_selected {
-                        let strctr = Structure::from_usize(self.strctr_idx);
                         self.strctr_selected = true;
-                        if let Some(s) = strctr {
-                            self.strctr_cursor = get_structure_vec(s);
-                        }
+                        self.strctr_cursor = self.structures.get_cells(self.strctr_idx);
                     } else {
                         self.strctr_selected = !self.strctr_selected;
                     }
                 }
                 Some(Keycode::D) => {
-                    if self.strctr_selected && Structure::from_usize(self.strctr_idx + 1).is_some()
-                    {
+                    if self.strctr_selected {
                         self.strctr_idx += 1;
-                        let strctr = Structure::from_usize(self.strctr_idx);
-                        self.strctr_cursor = get_structure_vec(strctr.unwrap());
+                        if self.strctr_idx > self.structures.len() {
+                            self.strctr_idx = self.structures.len();
+                        }
+                        self.strctr_cursor = self.structures.get_cells(self.strctr_idx);
                     }
                 }
                 Some(Keycode::A) => {
                     if self.strctr_selected {
                         self.strctr_idx = self.strctr_idx.saturating_sub(1);
-                        let strctr = Structure::from_usize(self.strctr_idx);
-                        if let Some(s) = strctr {
-                            self.strctr_cursor = get_structure_vec(s);
-                        }
+                        self.strctr_cursor = self.structures.get_cells(self.strctr_idx);
                     }
                 }
                 Some(Keycode::F) => {
@@ -369,16 +466,16 @@ impl Game {
                     }
                 }
                 Some(Keycode::H) => {
-                    self.cam_offset_x += 10;
+                    self.move_dir = Some(MoveDir::LEFT);
                 }
                 Some(Keycode::K) => {
-                    self.cam_offset_y += 10;
+                    self.move_dir = Some(MoveDir::UP);
                 }
                 Some(Keycode::J) => {
-                    self.cam_offset_y -= 10;
+                    self.move_dir = Some(MoveDir::DOWN);
                 }
                 Some(Keycode::L) => {
-                    self.cam_offset_x -= 10;
+                    self.move_dir = Some(MoveDir::RIGHT);
                 }
                 Some(Keycode::V) => {
                     self.board.randomize();
@@ -402,6 +499,14 @@ impl Game {
                     }
                 }
                 _ => {}
+            },
+            Event::KeyUp {
+                keycode, keymod, ..
+            } => match keycode {
+                Some(Keycode::H) | Some(Keycode::J) | Some(Keycode::K) | Some(Keycode::L) => {
+                    self.move_dir = None;
+                },
+                _ => {},
             },
             Event::MouseButtonDown {
                 x, y, mouse_btn, ..
@@ -434,8 +539,11 @@ impl Game {
                         && (0..self.board.width).contains(&new_x)
                         && (0..self.board.height).contains(&new_y)
                     {
-                        let cell_status = self.board.cells[new_x as usize][new_y as usize];
-                        self.board.cells[new_x as usize][new_y as usize] = !cell_status;
+                        if self.last_selected == None {
+                            let cell_status = self.board.cells[new_x as usize][new_y as usize];
+                            self.last_selected = Some(!cell_status);
+                            self.board.cells[new_x as usize][new_y as usize] = !cell_status;
+                        }
                     }
                 }
                 MouseButton::Right => {
@@ -444,8 +552,14 @@ impl Game {
                 _ => {}
             },
             Event::MouseButtonUp { mouse_btn, .. } => {
-                if mouse_btn == MouseButton::Right {
-                    self.pan_cam = false;
+                match mouse_btn {
+                    MouseButton::Left => {
+                        self.last_selected = None;
+                    },
+                    MouseButton::Right => {
+                        self.pan_cam = false;
+                    },
+                    _ => {}
                 }
             }
             Event::MouseWheel { y, .. } => {

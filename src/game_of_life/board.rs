@@ -42,7 +42,10 @@ impl Board {
         let neighbors = self.get_neighbor_count(x, y);
 
         if self.cells[y as usize][x as usize] {
-            matches!(neighbors, 2 | 3)
+            match neighbors {
+                2 | 3 => true,
+                _ => false,
+            }
         } else {
             neighbors == 3
         }
@@ -52,7 +55,7 @@ impl Board {
         for (y_pos, row) in self.cells.iter().enumerate() {
             for (x_pos, _) in row.iter().enumerate() {
                 let cell_status = self.evolve_cell(x_pos as i32, y_pos as i32);
-                self.new_cells[y_pos][x_pos as usize] = cell_status;
+                self.new_cells[y_pos][x_pos] = cell_status;
             }
         }
 

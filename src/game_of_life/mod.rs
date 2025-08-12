@@ -6,5 +6,5 @@ use game::Game;
 
 pub fn run_game() -> Result<(), String> {
     let mut game = Game::with_size(1280, 720);
-    Ok(game.game_loop()?)
+    game.game_loop()
 }
